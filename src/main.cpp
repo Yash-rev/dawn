@@ -31,17 +31,15 @@ struct Enemy {
     sf::Sprite sprite;
     float speed;
 
-    // We pass the texture by reference to save memory
     Enemy(sf::Vector2f startPosition, const sf::Texture& enemyTexture): sprite(enemyTexture) {
         sprite.setTexture(enemyTexture);
         
-        // Center the origin so they rotate/move from their middle
+     
         sf::Vector2u size = enemyTexture.getSize();
         sprite.setOrigin({static_cast<float>(size.x) / 2.f, static_cast<float>(size.y) / 2.f});
         
         sprite.setPosition(startPosition);
         
-        // Scale the enemy if the image is too big (e.g., 0.5f for half size)
         sprite.setScale({1.0f, 1.0f}); 
         
         speed = 150.f; 
@@ -56,13 +54,13 @@ struct Enemy {
             sf::Vector2f direction({dx / distance, dy / distance});
             sprite.move(direction * speed * dt);
             
-            // Optional: Make enemies face the player
+          
            
             if (dx > 0) {
-                // Moving right: Normal scale
+             
                 sprite.setScale({1.0f, 1.0f}); 
             } else if (dx < 0) {
-                // Moving left: Negative X scale flips the image horizontally!
+              
                 sprite.setScale({-1.0f, 1.0f}); 
             }
         }
@@ -92,11 +90,8 @@ public:
         
         texture.setSmooth(false); 
         
-        // Re-build the sprite now that the image is actually loaded 
-        // so it automatically scales to the correct width and height
         sprite = sf::Sprite(texture);
 
-        // Center the origin
         sf::Vector2u size = texture.getSize();
         sprite.setOrigin({static_cast<float>(size.x) / 2.f, static_cast<float>(size.y) / 2.f});
         
@@ -111,8 +106,6 @@ public:
         gunSprite.setScale({0.05f, 0.05f});
 
         sf::Vector2u gunSize = gunTexture.getSize();
-        // Negative X pushes it away from the player center just like before.
-        // Y uses half the image height to keep it centered on the hand.
         gunSprite.setOrigin({-15.f, static_cast<float>(gunSize.y) / 2.f}); 
 
         sprite.setPosition({startX, startY});
@@ -142,7 +135,6 @@ public:
         }
 
         sprite.move(movement * speed * dt);
-        // Create an offset (X, Y). Adjust these numbers to perfectly match your specific sprite's hand!
         sf::Vector2f handOffset(12.f, 10.f); 
         gunSprite.setPosition(sprite.getPosition() + handOffset); 
 
@@ -187,14 +179,13 @@ int main() {
     
     Player player(400.f, 300.f);
     
-    // --- UI FONT SETUP ---
     sf::Font font;
     bool hasFont = font.openFromFile("arial.ttf"); 
     if (!hasFont) std::printf("ERROR: Could not find arial.ttf!\n");
 
     // Menu Text
     sf::Text menuText(font);
-    menuText.setString("ZERO DAWN\nPress 'S' to Start\nPress 'Q' to Quit");
+    menuText.setString("DUSK\nPress 'S' to Start\nPress 'Q' to Quit");
     menuText.setCharacterSize(50);
     menuText.setFillColor(sf::Color::Cyan);
     menuText.setPosition({150.f, 200.f});
@@ -216,7 +207,7 @@ int main() {
         scoreText.setString("Kills: 0");
     }
 
-    // --- GRID SETUP ---
+    // GRID 
     sf::VertexArray grid(sf::PrimitiveType::Lines);
     sf::Color gridColor(30, 30, 30);
     for (int x = -5000; x <= 5000; x += 100) {
@@ -237,98 +228,115 @@ int main() {
     float spawnRate = 0.5f; 
     int killCount = 0;
     sf::Clock clock;
-
-    // --- LOAD ENEMY TEXTURE ---
     sf::Texture enemyTexture;
     if (!enemyTexture.loadFromFile("enemy.png")) {
         std::printf("ERROR: Could not load enemy.png\n");
     }
 
-    while (window.isOpen()) {
+   while (window.isOpen()) {
         float dt = clock.restart().asSeconds();
 
         while (const auto event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) window.close();
         }
 
-        // Center camera on sprite
-        worldView.setCenter(player.sprite.getPosition());
-        player.update(dt, window, worldView, bullets);
+        if (currentState == State::MENU) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) {
+                currentState = State::PLAYING;
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q)) {
+                window.close();
+            }
+        } 
+        
+        else if (currentState == State::PLAYING) {
+            player.update(dt, window, worldView, bullets);
+            
+            worldView.setCenter(player.sprite.getPosition());
 
-        if (!player.isDead) {
             spawnTimer -= dt;
             if (spawnTimer <= 0.f) {
-                float randomAngle = static_cast<float>(std::rand() % 360);
-                float angleRadians = randomAngle * 3.14159265f / 180.f;
-                // Spawn relative to sprite
+                float randomAngle = static_cast<float>(std::rand() % 360) * 3.14159f / 180.f;
                 sf::Vector2f spawnPos = player.sprite.getPosition() + 
-                    sf::Vector2f(std::cos(angleRadians) * 600.f, std::sin(angleRadians) * 600.f);
+                                       sf::Vector2f(std::cos(randomAngle) * 600.f, std::sin(randomAngle) * 600.f);
                 enemies.emplace_back(spawnPos, enemyTexture);
-                spawnTimer = spawnRate; 
+                spawnTimer = spawnRate;
             }
-        }
 
-        for (int i = bullets.size() - 1; i >= 0; i--) {
-            bullets[i].update(dt);
-            // Check distance from sprite
-            float distX = std::abs(bullets[i].shape.getPosition().x - player.sprite.getPosition().x);
-            float distY = std::abs(bullets[i].shape.getPosition().y - player.sprite.getPosition().y);
-            if (distX > 1000.f || distY > 1000.f) bullets.erase(bullets.begin() + i);
-        }
+            for (auto& e : enemies) e.update(dt, player.sprite.getPosition());
+            for (auto& b : bullets) b.update(dt);
 
-        for (auto& enemy : enemies) {
-            // Enemies chase sprite
-            enemy.update(dt, player.sprite.getPosition());
-        }
-
-        for (int i = bullets.size() - 1; i >= 0; i--) {
-            bool bulletHitSomething = false;
-            for (int j = enemies.size() - 1; j >= 0; j--) {
-                float dx = bullets[i].shape.getPosition().x - enemies[j].sprite.getPosition().x;
-                float dy = bullets[i].shape.getPosition().y - enemies[j].sprite.getPosition().y;
-                if (std::sqrt(dx * dx + dy * dy) < 15.f) { 
-                    enemies.erase(enemies.begin() + j); 
-                    bulletHitSomething = true;
-                    killCount++;
-                    break; 
+            for (int i = bullets.size() - 1; i >= 0; i--) {
+                for (int j = enemies.size() - 1; j >= 0; j--) {
+                    float dx = bullets[i].shape.getPosition().x - enemies[j].sprite.getPosition().x;
+                    float dy = bullets[i].shape.getPosition().y - enemies[j].sprite.getPosition().y;
+                    if (std::sqrt(dx*dx + dy*dy) < 20.f) {
+                        enemies.erase(enemies.begin() + j);
+                        bullets.erase(bullets.begin() + i);
+                        killCount++;
+                        break;
+                    }
                 }
             }
-            if (bulletHitSomething) bullets.erase(bullets.begin() + i);
-        }
 
-        if (!player.isDead) {
-            for (const auto& enemy : enemies) {
-                // Enemies collide with sprite
-                float dx = player.sprite.getPosition().x - enemy.sprite.getPosition().x;
-                float dy = player.sprite.getPosition().y - enemy.sprite.getPosition().y;
-                if (std::sqrt(dx * dx + dy * dy) < 30.f) player.takeDamage();
+            // Enemy vs Player
+            for (auto& e : enemies) {
+                float dx = e.sprite.getPosition().x - player.sprite.getPosition().x;
+                float dy = e.sprite.getPosition().y - player.sprite.getPosition().y;
+                if (std::sqrt(dx*dx + dy*dy) < 30.f) player.takeDamage();
+            }
+
+            if (player.isDead) currentState = State::GAMEOVER;
+        } 
+        
+        else if (currentState == State::GAMEOVER) {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R)) {
+                // RESET EVERYTHING
+                player.hp = player.maxHp;
+                player.isDead = false;
+                player.sprite.setPosition({400.f, 300.f});
+                player.sprite.setColor(sf::Color::White);
+                enemies.clear();
+                bullets.clear();
+                killCount = 0;
+                currentState = State::PLAYING;
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::H)) {
+                currentState = State::MENU;
             }
         }
 
-        if (hasFont) scoreText.setString("Kills: " + std::to_string(killCount));
-
-        // --- RENDER ---
         window.clear(sf::Color::Black);
-        
-        window.setView(worldView);
-        window.draw(grid);
-        player.draw(window);
-        for (const auto& b : bullets) window.draw(b.shape);
-        for (const auto& enemy : enemies) window.draw(enemy.sprite);
-        
-        window.setView(uiView);
-        sf::RectangleShape hpBackground({200.f, 20.f});
-        hpBackground.setPosition({20.f, 20.f});
-        hpBackground.setFillColor(sf::Color(100, 0, 0)); 
-        window.draw(hpBackground);
 
-        float hpPercent = static_cast<float>(std::max(0, player.hp)) / player.maxHp;
-        sf::RectangleShape hpForeground({200.f * hpPercent, 20.f});
-        hpForeground.setPosition({20.f, 20.f});
-        hpForeground.setFillColor(sf::Color::Red); 
-        window.draw(hpForeground);
+        if (currentState == State::MENU) {
+            window.setView(uiView);
+            window.draw(menuText);
+        }
+        else if (currentState == State::PLAYING) {
+            // Draw the moving world
+            window.setView(worldView);
+            window.draw(grid);
+            for (auto& e : enemies) window.draw(e.sprite);
+            for (auto& b : bullets) window.draw(b.shape);
+            player.draw(window);
 
-        if (hasFont) window.draw(scoreText);
+            // Draw the static UI
+            window.setView(uiView);
+            if (hasFont) {
+                scoreText.setString("Kills: " + std::to_string(killCount));
+                window.draw(scoreText);
+            }
+            
+            // Draw HP Bar
+            sf::RectangleShape hpBar({200.f * (player.hp / (float)player.maxHp), 20.f});
+            hpBar.setFillColor(sf::Color::Red);
+            hpBar.setPosition({20.f, 20.f});
+            window.draw(hpBar);
+        }
+        else if (currentState == State::GAMEOVER) {
+            window.setView(uiView);
+            window.draw(gameOverText);
+        }
 
         window.display();
     }
