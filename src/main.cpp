@@ -6,7 +6,7 @@
 #include <string>
 const int MAP_WIDTH = 200;
 const int MAP_HEIGHT = 200;
-const float TILE_SIZE = 64.f;
+const float TILE_SIZE = 32.f;
 
 enum class State
 {
@@ -57,26 +57,39 @@ struct Enemy
         speed = 150.f;
     }
 
-    void update(float dt, sf::Vector2f playerPosition)
-    {
-        float dx = playerPosition.x - sprite.getPosition().x;
-        float dy = playerPosition.y - sprite.getPosition().y;
+    void update(float dt, sf::Vector2f playerPos, const std::vector<std::vector<int>>& dungeonMap) {
+        sf::Vector2f currentPos = sprite.getPosition();
+        
+        // Calculate direction towards player
+        float dx = playerPos.x - currentPos.x;
+        float dy = playerPos.y - currentPos.y;
         float distance = std::sqrt(dx * dx + dy * dy);
-
-        if (distance > 0)
-        {
-            sf::Vector2f direction({dx / distance, dy / distance});
-            sprite.move(direction * speed * dt);
-
-            if (dx > 0)
-            {
-
-                sprite.setScale({1.0f, 1.0f});
+        
+        if (distance > 0) {
+            float moveX = (dx / distance) * speed * dt;
+            float moveY = (dy / distance) * speed * dt;
+            
+            // --- 1. Check Horizontal (X) Wall Sliding ---
+            float nextX = currentPos.x + moveX;
+            int gridX = static_cast<int>(nextX / TILE_SIZE);
+            int gridY = static_cast<int>(currentPos.y / TILE_SIZE); 
+            
+            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                if (dungeonMap[gridX][gridY] == 0) {
+                    sprite.move({moveX, 0.f});
+                }
             }
-            else if (dx < 0)
-            {
 
-                sprite.setScale({-1.0f, 1.0f});
+            // --- 2. Check Vertical (Y) Wall Sliding ---
+            currentPos = sprite.getPosition(); // Update position after X movement
+            float nextY = currentPos.y + moveY;
+            gridX = static_cast<int>(currentPos.x / TILE_SIZE); 
+            gridY = static_cast<int>(nextY / TILE_SIZE);
+            
+            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                if (dungeonMap[gridX][gridY] == 0) {
+                    sprite.move({0.f, moveY});
+                }
             }
         }
     }
@@ -360,7 +373,7 @@ int main()
                     dungeonMap[x][y] = 1; 
                 } 
                 // --- THE FIX: Clear a 3-tile radius around the center ---
-                else if (std::rand() % 100 < 10 && (std::abs(x - centerGridX) > 3 || std::abs(y - centerGridY) > 3)) {
+                else if (std::rand() % 100 < 2 && (std::abs(x - centerGridX) > 3 || std::abs(y - centerGridY) > 3)) {
                     dungeonMap[x][y] = (std::rand() % numObstacleTypes) + 1;
                 }
             }
@@ -404,10 +417,26 @@ int main()
                 spawnTimer = spawnRate;
             }
 
-            for (auto &e : enemies)
-                e.update(dt, player.sprite.getPosition());
-            for (auto &b : bullets)
-                b.update(dt);
+            for (auto& e : enemies) {
+                e.update(dt, player.sprite.getPosition(), dungeonMap);
+            }
+
+            // 2. Update Bullets and Destroy on Wall Impact
+            // We use a backwards loop here so we can safely erase bullets mid-loop!
+            for (int i = bullets.size() - 1; i >= 0; i--) {
+                bullets[i].update(dt);
+                
+                sf::Vector2f pos = bullets[i].shape.getPosition();
+                int gridX = static_cast<int>(pos.x / TILE_SIZE);
+                int gridY = static_cast<int>(pos.y / TILE_SIZE);
+                
+                // If bullet hits a wall (anything greater than 0)
+                if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                    if (dungeonMap[gridX][gridY] > 0) {
+                        bullets.erase(bullets.begin() + i);
+                    }
+                }
+            }
 
             for (int i = bullets.size() - 1; i >= 0; i--)
             {
