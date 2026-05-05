@@ -60,7 +60,7 @@ struct Enemy
     void update(float dt, sf::Vector2f playerPos, const std::vector<std::vector<int>>& dungeonMap) {
         sf::Vector2f currentPos = sprite.getPosition();
         
-        // Calculate direction towards player
+        //direction towards player
         float dx = playerPos.x - currentPos.x;
         float dy = playerPos.y - currentPos.y;
         float distance = std::sqrt(dx * dx + dy * dy);
@@ -69,7 +69,7 @@ struct Enemy
             float moveX = (dx / distance) * speed * dt;
             float moveY = (dy / distance) * speed * dt;
             
-            // --- 1. Check Horizontal (X) Wall Sliding ---
+            //  Wall Sliding
             float nextX = currentPos.x + moveX;
             int gridX = static_cast<int>(nextX / TILE_SIZE);
             int gridY = static_cast<int>(currentPos.y / TILE_SIZE); 
@@ -80,7 +80,6 @@ struct Enemy
                 }
             }
 
-            // --- 2. Check Vertical (Y) Wall Sliding ---
             currentPos = sprite.getPosition(); // Update position after X movement
             float nextY = currentPos.y + moveY;
             gridX = static_cast<int>(currentPos.x / TILE_SIZE); 
@@ -97,7 +96,7 @@ struct Enemy
 class Player
 {
 public:
-    sf::Texture idleTexture; // For player.png
+    sf::Texture idleTexture; 
     sf::Texture runTexture;
     sf::Sprite sprite;
     sf::Texture gunTexture;
@@ -118,7 +117,7 @@ public:
     int currentFrame = 0;
     int maxFrames;
     float animTimer = 0.f;
-    float animDuration = 0.15f; // How fast the animation plays (0.15 seconds per frame)
+    float animDuration = 0.15f; 
     bool isMoving = false;
     bool isFacingRight = true;
 
@@ -129,36 +128,33 @@ public:
         frameHeight = fHeight;
         maxFrames = frames;
 
-        // 1. LOAD IDLE TEXTURE (player.png)
+        
         if (!idleTexture.loadFromFile("player.png")) {
             std::printf("ERROR: Could not load player.png\n");
         }
         idleTexture.setSmooth(false);
 
-        // 2. LOAD RUN TEXTURE (player_run.png)
+       
         if (!runTexture.loadFromFile("player_running.png")) {
             std::printf("ERROR: Could not load player_run.png\n");
         }
         runTexture.setSmooth(false);
 
-        // 3. SETUP DEFAULT SPRITE (Standing Still)
-        // Force the sprite to refresh now that the texture is loaded
         sprite.setTexture(idleTexture, true); 
         
         sf::Vector2u idleSize = idleTexture.getSize();
         
-        // Use the full image size for the idle origin
         sprite.setOrigin({static_cast<float>(idleSize.x) / 2.f, static_cast<float>(idleSize.y) / 2.f});
         sprite.setScale({0.1f, 0.1f}); 
         sprite.setPosition({startX, startY});
 
-        // 4. LOAD GUN 
+        // GUN 
         if (!gunTexture.loadFromFile("gun.png")) {
             std::printf("ERROR: Could not load gun.png\n");
         }
         gunTexture.setSmooth(false);
         
-        // Force the gun sprite to refresh 
+     
         gunSprite.setTexture(gunTexture, true);
 
         sf::Vector2u gunSize = gunTexture.getSize();
@@ -167,10 +163,10 @@ public:
         gunSprite.setPosition({startX, startY});
     }
 
-    // Notice the new argument at the end: const int dungeonMap[MAP_WIDTH][MAP_HEIGHT]
+    
     void update(float dt, const sf::RenderWindow &window, const sf::View &worldView, std::vector<Bullet> &activeBullets, const std::vector<std::vector<int>> &dungeonMap)
     {
-        // --- 1. IFRAMES (Damage Flashing) ---
+
         if (iFrameTimer > 0.f)
         {
             iFrameTimer -= dt;
@@ -181,14 +177,12 @@ public:
             sprite.setColor(sf::Color::White);
         }
 
-        // --- 2. INPUT & NORMALIZATION ---
         sf::Vector2f movement({0.f, 0.f});
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) movement.y -= 1.f;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) movement.y += 1.f;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) movement.x -= 1.f;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) movement.x += 1.f;
 
-        // Determine if we are moving for the animation logic!
         isMoving = (movement.x != 0.f || movement.y != 0.f);
 
         if (isMoving)
@@ -198,10 +192,10 @@ public:
             movement.y /= length;
         }
 
-        // --- 3. MAP COLLISION (Wall Sliding) ---
+        // MAP COLLISION
         sf::Vector2f currentPos = sprite.getPosition();
 
-        // Horizontal (X)
+        
         if (movement.x != 0.f)
         {
             float nextX = currentPos.x + (movement.x * speed * dt);
@@ -215,7 +209,7 @@ public:
             }
         }
 
-        // Vertical (Y)
+    
         currentPos = sprite.getPosition();
         if (movement.y != 0.f)
         {
@@ -230,24 +224,23 @@ public:
             }
         }
 
-        // --- 4. ANIMATION & TEXTURE SWAPPING ---
+        // ANIMATION 
         
-        // 1. Check which way the player is moving horizontally
         if (movement.x > 0.f) isFacingRight = true;
         if (movement.x < 0.f) isFacingRight = false;
 
         if (isMoving) 
         {
-            // A. Swap to RUN texture if needed
+
             if (&sprite.getTexture() != &runTexture) {
                 sprite.setTexture(runTexture);
                 sprite.setOrigin({static_cast<float>(frameWidth) / 2.f, static_cast<float>(frameHeight) / 2.f});
             }
 
-            // B. Apply RUN SCALE (Flip the X axis if facing left!)
+            
             sprite.setScale({isFacingRight ? runScale.x : -runScale.x, runScale.y});
 
-            // C. Play the animation frames
+            
             animTimer += dt;
             if (animTimer >= animDuration) {
                 currentFrame++;
@@ -257,12 +250,12 @@ public:
                 animTimer = 0.f;
             }
             
-            // D. Move the "cookie cutter" to the current frame
+            
             sprite.setTextureRect(sf::IntRect({currentFrame * frameWidth, 0}, {frameWidth, frameHeight}));
         } 
         else 
         {
-            // A. Swap to IDLE texture if needed
+            
             if (&sprite.getTexture() != &idleTexture) {
                 sprite.setTexture(idleTexture);
                 
@@ -274,18 +267,17 @@ public:
                 animTimer = 0.f;
             }
 
-            // B. Apply IDLE SCALE (Flip the X axis if facing left!)
+            
             sprite.setScale({isFacingRight ? idleScale.x : -idleScale.x, idleScale.y});
         }
 
-        // --- 5. UPDATE GUN ---
         
-        // 1. Flip the hand offset depending on which way the PLAYER is facing
+        
         float currentHandOffsetX = isFacingRight ? 12.f : -12.f;
         sf::Vector2f handOffset(currentHandOffsetX, 10.f);
         gunSprite.setPosition(sprite.getPosition() + handOffset);
 
-        // 2. Calculate aiming angle
+
         sf::Vector2i mousePixelPos = sf::Mouse::getPosition(window);
         sf::Vector2f mousePos = window.mapPixelToCoords(mousePixelPos, worldView);
         float dx = mousePos.x - sprite.getPosition().x;
@@ -293,18 +285,18 @@ public:
         float angle = std::atan2(dy, dx) * 180.f / 3.14159265f;
         gunSprite.setRotation(sf::degrees(angle));
 
-        // 3. Mirror the gun visually so it isn't upside down when aiming left!
+        
         if (dx < 0.f) 
         {
-            // Aiming Left: Flip the local Y-axis (-0.05f) to flip it right-side up
+            
             gunSprite.setScale({0.05f, -0.05f});
         } 
         else 
         {
-            // Aiming Right: Normal scale (0.05f)
+
             gunSprite.setScale({0.05f, 0.05f});
         }
-        // --- 6. SHOOTING ---
+        // SHOOTING 
         fireCooldown -= dt;
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && fireCooldown <= 0.f)
         {
@@ -340,6 +332,33 @@ public:
     }
 };
 
+sf::View getLetterboxView(sf::View view, int windowWidth, int windowHeight) {
+
+    float windowRatio = windowWidth / static_cast<float>(windowHeight);
+    float viewRatio = view.getSize().x / static_cast<float>(view.getSize().y);
+
+    float sizeX = 1.0f;
+    float sizeY = 1.0f;
+    float posX = 0.0f;
+    float posY = 0.0f;
+
+    
+    if (windowRatio >= viewRatio) {
+    
+        sizeX = viewRatio / windowRatio;
+        posX = (1.0f - sizeX) / 2.0f;
+    } else {
+    
+        sizeY = windowRatio / viewRatio;
+        posY = (1.0f - sizeY) / 2.0f;
+    }
+
+    
+    view.setViewport(sf::FloatRect({posX, posY}, {sizeX, sizeY}));
+
+    return view;
+}
+
 int main()
 {
     std::srand(static_cast<unsigned>(std::time(nullptr)));
@@ -348,7 +367,6 @@ int main()
     float spawnX = (MAP_WIDTH * TILE_SIZE) / 2.f;
     float spawnY = (MAP_HEIGHT * TILE_SIZE) / 2.f;
     
-    // Now create the player using these new variables!
     Player player(spawnX, spawnY, 500, 512, 4);
     sf::Font font;
     bool hasFont = font.openFromFile("arial.ttf");
@@ -421,13 +439,13 @@ int main()
         std::printf("ERROR: Could not load enemy.png\n");
     }
 
-    // --- LOAD OBSTACLE TEXTURES ---
+
     std::vector<std::string> obstacleFiles = {"brick.png", "tree.png", "rock.png"};
     std::vector<sf::Texture> obstacleTextures;
-// --- LOAD FLOOR TEXTURE ---
+
     sf::Texture floorTexture;
     if (floorTexture.loadFromFile("floor.png")) {
-        // Keeps pixel art looking crisp instead of blurry
+
         floorTexture.setSmooth(false); 
     } else {
         std::printf("WARNING: Could not load floor.png\n");
@@ -446,13 +464,12 @@ int main()
         }
     }
 
-    // --- GENERATE MAP GRID ---
-    // 0 = Floor, 1+ = Specific Obstacle Type
+
     std::vector<std::vector<int>> dungeonMap(MAP_WIDTH, std::vector<int>(MAP_HEIGHT, 0));
     int numObstacleTypes = obstacleTextures.size();
 
    if (numObstacleTypes > 0) {
-        // Calculate the grid coordinates for the center
+        
         int centerGridX = MAP_WIDTH / 2;
         int centerGridY = MAP_HEIGHT / 2;
 
@@ -462,7 +479,7 @@ int main()
                 if (x == 0 || x == MAP_WIDTH - 1 || y == 0 || y == MAP_HEIGHT - 1) {
                     dungeonMap[x][y] = 1; 
                 } 
-                // --- THE FIX: Clear a 3-tile radius around the center ---
+                
                 else if (std::rand() % 100 < 2 && (std::abs(x - centerGridX) > 3 || std::abs(y - centerGridY) > 3)) {
                     dungeonMap[x][y] = (std::rand() % numObstacleTypes) + 1;
                 }
@@ -477,6 +494,13 @@ int main()
         {
             if (event->is<sf::Event::Closed>())
                 window.close();
+
+           if (const auto* resized = event->getIf<sf::Event::Resized>()) {
+                
+               
+                worldView = getLetterboxView(worldView, resized->size.x, resized->size.y);
+                uiView = getLetterboxView(uiView, resized->size.x, resized->size.y);
+            }
         }
 
         if (currentState == State::MENU)
@@ -484,6 +508,13 @@ int main()
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
             {
                 currentState = State::PLAYING;
+                player.hp = player.maxHp; 
+            player.sprite.setPosition({(MAP_WIDTH * TILE_SIZE) / 2.0f, (MAP_HEIGHT * TILE_SIZE) / 2.0f});
+            
+            killCount = 0;
+            scoreText.setString("Kills: 0");
+             
+            enemies.clear();
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
             {
@@ -516,30 +547,30 @@ int main()
                 bullets[i].update(dt);
                 bool bulletDestroyed = false;
                 
-                // A. Check Wall Collision First
+                // Wall Collision 
                 sf::Vector2f pos = bullets[i].shape.getPosition();
                 int gridX = static_cast<int>(pos.x / TILE_SIZE);
                 int gridY = static_cast<int>(pos.y / TILE_SIZE);
                 
                 if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
-                    // If it hits a wall (1 or higher), destroy bullet
+                   
                     if (dungeonMap[gridX][gridY] > 0) {
                         bullets.erase(bullets.begin() + i);
                         bulletDestroyed = true;
                     }
                 }
                 
-                // B. Check Enemy Collision (Only if it didn't just hit a wall!)
+                
                 if (!bulletDestroyed) {
                     for (int j = enemies.size() - 1; j >= 0; j--) {
                         
-                        // If the bullet's hitbox touches the enemy's hitbox
+                       
                        if (bullets[i].shape.getGlobalBounds().findIntersection(enemies[j].sprite.getGlobalBounds())) {
                             
-                            // 1. Destroy the enemy
+                            
                             enemies.erase(enemies.begin() + j);
                             
-                            // 2. Destroy the bullet
+                          
                             bullets.erase(bullets.begin() + i);
                             
                             
@@ -554,7 +585,7 @@ int main()
                 }
             }
 
-            // Enemy vs Player
+           
             for (auto &e : enemies)
             {
                 float dx = e.sprite.getPosition().x - player.sprite.getPosition().x;
@@ -563,7 +594,7 @@ int main()
                     player.takeDamage();
             }
 
-            if (player.isDead)
+            if (player.hp<=0)
                 currentState = State::GAMEOVER;
         }
 
@@ -571,7 +602,7 @@ int main()
         {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R))
             {
-                // RESET EVERYTHING
+                // RESET
                 player.hp = player.maxHp;
                 player.isDead = false;
                 player.sprite.setPosition({spawnX, spawnY});
@@ -579,15 +610,24 @@ int main()
                 enemies.clear();
                 bullets.clear();
                 killCount = 0;
+                scoreText.setString("Kills: 0");
                 currentState = State::PLAYING;
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::H))
             {
                 currentState = State::MENU;
+                player.hp = player.maxHp; 
+            player.sprite.setPosition({(MAP_WIDTH * TILE_SIZE) / 2.0f, (MAP_HEIGHT * TILE_SIZE) / 2.0f});
+            
+            killCount = 0;
+            scoreText.setString("Kills: 0");
+            
+            enemies.clear();
+                
             }
         }
 
-       // --- 4. RENDER SECTION ---
+       
         window.clear(sf::Color::Black);
 
         if (currentState == State::MENU) {
@@ -596,19 +636,19 @@ int main()
         }
         else if (currentState == State::PLAYING) {
             
-            // 1. TURN ON THE CAMERA
+            
             window.setView(worldView);
             
-            // 2. Draw the background grid
+        
             window.draw(grid);
 
-            // 3. DRAW THE MAP OBSTACLES
+            
            for (int x = 0; x < MAP_WIDTH; x++) {
                 for (int y = 0; y < MAP_HEIGHT; y++) {
                     
                     int tileID = dungeonMap[x][y];
                     
-                    // 1. ALWAYS DRAW THE FLOOR FIRST (No 'if tileID == 0' needed!)
+                    
                     sf::Sprite floorSprite(floorTexture);
                     
                     sf::Vector2u floorTexSize = floorTexture.getSize();
@@ -620,7 +660,7 @@ int main()
                     
                     window.draw(floorSprite);
 
-                    // 2. DRAW THE OBSTACLES RIGHT ON TOP (If tile is 1 or higher)
+                    
                     if (tileID > 0 && !obstacleTextures.empty()) {
                         const sf::Texture& currentTexture = obstacleTextures[tileID - 1];
                         sf::Sprite wallSprite(currentTexture);
@@ -636,12 +676,12 @@ int main()
                     }
                 }
             }
-            // 4. DRAW ENTITIES
+            // DRAW ENTITIES
             for (auto& e : enemies) window.draw(e.sprite);
             for (auto& b : bullets) window.draw(b.shape);
             player.draw(window);
 
-            // 5. SWITCH TO UI CAMERA (For static HUD elements)
+            // SWITCH TO UI CAMERA 
             window.setView(uiView);
             window.draw(scoreText);
             
