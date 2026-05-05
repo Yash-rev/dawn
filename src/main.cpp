@@ -1,4 +1,6 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
+#include <optional>
 #include <cmath>
 #include <vector>
 #include <cstdlib>
@@ -7,6 +9,14 @@
 const int MAP_WIDTH = 200;
 const int MAP_HEIGHT = 200;
 const float TILE_SIZE = 64.f;
+
+ sf::Music bgm; 
+    
+    sf::SoundBuffer shootBuffer; 
+    sf::SoundBuffer killBuffer;
+    
+    std::optional<sf::Sound> shootSound;        
+    std::optional<sf::Sound> killSound;
 
 enum class State
 {
@@ -308,6 +318,8 @@ public:
                 activeBullets.emplace_back(spawnPos, fireDirection);
                 fireCooldown = fireRate;
             }
+            shootSound->play();
+            
         }
     }
 
@@ -376,7 +388,33 @@ int main()
     loadingText.setFillColor(sf::Color::White);
 
     loadingText.setPosition({window.getSize().x / 2.0f - 150.f, window.getSize().y / 2.0f - 50.f});
+    
 
+    
+    if (!shootBuffer.loadFromFile("shootSound.nmp3")) { 
+
+    }
+   
+   
+
+
+    if (!bgm.openFromFile("bgm.mp3")) { 
+        // Error handling if music is missing
+    }
+    bgm.setLooping(true); // Tell the music to loop forever! (If you get an error, try setLoop(true))
+    bgm.setVolume(50.f);  // Background music is usually too loud, turn it down a bit (0 to 100)
+
+   if (!shootBuffer.loadFromFile("shootSound.mp3")) { /* Error handling */ }
+    
+    // Put the sound into the optional box and give it the buffer!
+    shootSound.emplace(shootBuffer);
+    shootSound->setVolume(70.f); // Notice we use an arrow (->) now!
+
+    
+    if (!killBuffer.loadFromFile("killSound.mp3")) { /* Error handling */ }
+    
+    killSound.emplace(killBuffer);
+    killSound->setVolume(80.f);
 
     float spawnX = (MAP_WIDTH * TILE_SIZE) / 2.f;
     float spawnY = (MAP_HEIGHT * TILE_SIZE) / 2.f;
@@ -500,6 +538,7 @@ int main()
             }
         }
     }
+    bgm.play();
     while (window.isOpen())
     {
         float dt = clock.restart().asSeconds();
@@ -594,7 +633,7 @@ int main()
                             
                           
                             bullets.erase(bullets.begin() + i);
-                            
+                            killSound->play();
                             
                             killCount++;
                             

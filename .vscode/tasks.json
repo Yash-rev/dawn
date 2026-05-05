@@ -6,6 +6,7 @@
             "label": "Build SFML Game",
             "command": "g++",
             "args": [
+                
                 "-fdiagnostics-color=always",
                 "-g",
                 "-std=c++17",
@@ -15,6 +16,7 @@
                 "-lsfml-graphics",
                 "-lsfml-window",
                 "-lsfml-system",
+                "-lsfml-audio",
                 "-o",
                 "${workspaceFolder}/game.exe"
             ],
