@@ -364,6 +364,20 @@ int main()
     std::srand(static_cast<unsigned>(std::time(nullptr)));
     sf::RenderWindow window(sf::VideoMode({800, 600}), "Dusk");
 
+    sf::Font mainFont;
+    
+  
+    if (!mainFont.openFromFile("arial.ttf")) {
+    }
+
+    sf::Text loadingText(mainFont); 
+    loadingText.setString("LOADING...");
+    loadingText.setCharacterSize(60);
+    loadingText.setFillColor(sf::Color::White);
+
+    loadingText.setPosition({window.getSize().x / 2.0f - 150.f, window.getSize().y / 2.0f - 50.f});
+
+
     float spawnX = (MAP_WIDTH * TILE_SIZE) / 2.f;
     float spawnY = (MAP_HEIGHT * TILE_SIZE) / 2.f;
     
@@ -507,14 +521,22 @@ int main()
         {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
             {
+                window.clear(sf::Color::Black);
+                    window.draw(loadingText);
+                    window.display(); 
+
+                    
                 currentState = State::PLAYING;
                 player.hp = player.maxHp; 
+                player.isDead= false;
             player.sprite.setPosition({(MAP_WIDTH * TILE_SIZE) / 2.0f, (MAP_HEIGHT * TILE_SIZE) / 2.0f});
             
             killCount = 0;
             scoreText.setString("Kills: 0");
              
             enemies.clear();
+            sf::sleep(sf::seconds(0.5f)); 
+            clock.restart();
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Q))
             {
