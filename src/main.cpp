@@ -6,7 +6,7 @@
 #include <string>
 const int MAP_WIDTH = 200;
 const int MAP_HEIGHT = 200;
-const float TILE_SIZE = 32.f;
+const float TILE_SIZE = 64.f;
 
 enum class State
 {
@@ -341,7 +341,14 @@ int main()
     // --- LOAD OBSTACLE TEXTURES ---
     std::vector<std::string> obstacleFiles = {"brick.png", "tree.png", "rock.png"};
     std::vector<sf::Texture> obstacleTextures;
-
+// --- LOAD FLOOR TEXTURE ---
+    sf::Texture floorTexture;
+    if (floorTexture.loadFromFile("floor.png")) {
+        // Keeps pixel art looking crisp instead of blurry
+        floorTexture.setSmooth(false); 
+    } else {
+        std::printf("WARNING: Could not load floor.png\n");
+    }
     for (const auto &file : obstacleFiles)
     {
         sf::Texture tex;
@@ -421,35 +428,45 @@ int main()
                 e.update(dt, player.sprite.getPosition(), dungeonMap);
             }
 
-            // 2. Update Bullets and Destroy on Wall Impact
-            // We use a backwards loop here so we can safely erase bullets mid-loop!
+            
             for (int i = bullets.size() - 1; i >= 0; i--) {
                 bullets[i].update(dt);
+                bool bulletDestroyed = false;
                 
+                // A. Check Wall Collision First
                 sf::Vector2f pos = bullets[i].shape.getPosition();
                 int gridX = static_cast<int>(pos.x / TILE_SIZE);
                 int gridY = static_cast<int>(pos.y / TILE_SIZE);
                 
-                // If bullet hits a wall (anything greater than 0)
                 if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                    // If it hits a wall (1 or higher), destroy bullet
                     if (dungeonMap[gridX][gridY] > 0) {
                         bullets.erase(bullets.begin() + i);
+                        bulletDestroyed = true;
                     }
                 }
-            }
-
-            for (int i = bullets.size() - 1; i >= 0; i--)
-            {
-                for (int j = enemies.size() - 1; j >= 0; j--)
-                {
-                    float dx = bullets[i].shape.getPosition().x - enemies[j].sprite.getPosition().x;
-                    float dy = bullets[i].shape.getPosition().y - enemies[j].sprite.getPosition().y;
-                    if (std::sqrt(dx * dx + dy * dy) < 20.f)
-                    {
-                        enemies.erase(enemies.begin() + j);
-                        bullets.erase(bullets.begin() + i);
-                        killCount++;
-                        break;
+                
+                // B. Check Enemy Collision (Only if it didn't just hit a wall!)
+                if (!bulletDestroyed) {
+                    for (int j = enemies.size() - 1; j >= 0; j--) {
+                        
+                        // If the bullet's hitbox touches the enemy's hitbox
+                       if (bullets[i].shape.getGlobalBounds().findIntersection(enemies[j].sprite.getGlobalBounds())) {
+                            
+                            // 1. Destroy the enemy
+                            enemies.erase(enemies.begin() + j);
+                            
+                            // 2. Destroy the bullet
+                            bullets.erase(bullets.begin() + i);
+                            
+                            
+                            killCount++;
+                            
+                            
+                            scoreText.setString("Kills: " + std::to_string(killCount));
+                            
+                            break; 
+                        }
                     }
                 }
             }
@@ -487,61 +504,70 @@ int main()
             }
         }
 
+       // --- 4. RENDER SECTION ---
         window.clear(sf::Color::Black);
 
-        if (currentState == State::MENU)
-        {
+        if (currentState == State::MENU) {
             window.setView(uiView);
             window.draw(menuText);
         }
-        else if (currentState == State::PLAYING)
-        {
-            // Draw the moving world
+        else if (currentState == State::PLAYING) {
+            
+            // 1. TURN ON THE CAMERA
             window.setView(worldView);
-            worldView.setCenter(player.sprite.getPosition());
-            // --- DRAW THE MAP ---
-            for (int x = 0; x < MAP_WIDTH; x++)
-            {
-                for (int y = 0; y < MAP_HEIGHT; y++)
-                {
+            
+            // 2. Draw the background grid
+            window.draw(grid);
 
+            // 3. DRAW THE MAP OBSTACLES
+           for (int x = 0; x < MAP_WIDTH; x++) {
+                for (int y = 0; y < MAP_HEIGHT; y++) {
+                    
                     int tileID = dungeonMap[x][y];
+                    
+                    // 1. ALWAYS DRAW THE FLOOR FIRST (No 'if tileID == 0' needed!)
+                    sf::Sprite floorSprite(floorTexture);
+                    
+                    sf::Vector2u floorTexSize = floorTexture.getSize();
+                    float floorScaleX = TILE_SIZE / static_cast<float>(floorTexSize.x);
+                    float floorScaleY = TILE_SIZE / static_cast<float>(floorTexSize.y);
+                    
+                    floorSprite.setScale({floorScaleX, floorScaleY});
+                    floorSprite.setPosition({x * TILE_SIZE, y * TILE_SIZE});
+                    
+                    window.draw(floorSprite);
 
-                    if (tileID > 0 && !obstacleTextures.empty())
-                    {
-                        // --- THE FIX ---
-                        // Create the sprite right here, feeding it the correct texture immediately!
-                        sf::Sprite wallSprite(obstacleTextures[tileID - 1]);
-                        wallSprite.setScale({TILE_SIZE / obstacleTextures[tileID - 1].getSize().x,
-                                             TILE_SIZE / obstacleTextures[tileID - 1].getSize().y});
-
+                    // 2. DRAW THE OBSTACLES RIGHT ON TOP (If tile is 1 or higher)
+                    if (tileID > 0 && !obstacleTextures.empty()) {
+                        const sf::Texture& currentTexture = obstacleTextures[tileID - 1];
+                        sf::Sprite wallSprite(currentTexture);
+                        
+                        sf::Vector2u wallTexSize = currentTexture.getSize();
+                        float wallScaleX = TILE_SIZE / static_cast<float>(wallTexSize.x);
+                        float wallScaleY = TILE_SIZE / static_cast<float>(wallTexSize.y);
+                        
+                        wallSprite.setScale({wallScaleX, wallScaleY});
                         wallSprite.setPosition({x * TILE_SIZE, y * TILE_SIZE});
+                        
                         window.draw(wallSprite);
                     }
                 }
             }
-            for (auto &e : enemies)
-                window.draw(e.sprite);
-            for (auto &b : bullets)
-                window.draw(b.shape);
+            // 4. DRAW ENTITIES
+            for (auto& e : enemies) window.draw(e.sprite);
+            for (auto& b : bullets) window.draw(b.shape);
             player.draw(window);
 
-            // Draw the static UI
+            // 5. SWITCH TO UI CAMERA (For static HUD elements)
             window.setView(uiView);
-            if (hasFont)
-            {
-                scoreText.setString("Kills: " + std::to_string(killCount));
-                window.draw(scoreText);
-            }
-
-            // Draw HP Bar
+            window.draw(scoreText);
+            
             sf::RectangleShape hpBar({200.f * (player.hp / (float)player.maxHp), 20.f});
             hpBar.setFillColor(sf::Color::Red);
             hpBar.setPosition({20.f, 20.f});
             window.draw(hpBar);
         }
-        else if (currentState == State::GAMEOVER)
-        {
+        else if (currentState == State::GAMEOVER) {
             window.setView(uiView);
             window.draw(gameOverText);
         }
