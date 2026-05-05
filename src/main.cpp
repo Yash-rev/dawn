@@ -97,11 +97,13 @@ struct Enemy
 class Player
 {
 public:
-    sf::Texture texture;
+    sf::Texture idleTexture; // For player.png
+    sf::Texture runTexture;
     sf::Sprite sprite;
     sf::Texture gunTexture;
     sf::Sprite gunSprite;
-
+    sf::Vector2f idleScale = {0.1f, 0.1f};
+    sf::Vector2f runScale = {0.14f, 0.14f};
     float speed = 300.f;
     int hp = 3;
     int maxHp = 3;
@@ -111,89 +113,109 @@ public:
     float fireRate = 0.15f;
     float fireCooldown = 0.f;
 
-    Player(float startX, float startY) : sprite(texture), gunSprite(gunTexture)
-    {
+    int frameWidth;
+    int frameHeight;
+    int currentFrame = 0;
+    int maxFrames;
+    float animTimer = 0.f;
+    float animDuration = 0.15f; // How fast the animation plays (0.15 seconds per frame)
+    bool isMoving = false;
+    bool isFacingRight = true;
 
-        if (!texture.loadFromFile("player.png"))
-        {
+   Player(float startX, float startY, int fWidth, int fHeight, int frames) 
+        : sprite(idleTexture), gunSprite(gunTexture) 
+    {
+        frameWidth = fWidth;
+        frameHeight = fHeight;
+        maxFrames = frames;
+
+        // 1. LOAD IDLE TEXTURE (player.png)
+        if (!idleTexture.loadFromFile("player.png")) {
             std::printf("ERROR: Could not load player.png\n");
         }
+        idleTexture.setSmooth(false);
 
-        texture.setSmooth(false);
+        // 2. LOAD RUN TEXTURE (player_run.png)
+        if (!runTexture.loadFromFile("player_running.png")) {
+            std::printf("ERROR: Could not load player_run.png\n");
+        }
+        runTexture.setSmooth(false);
 
-        sprite = sf::Sprite(texture);
+        // 3. SETUP DEFAULT SPRITE (Standing Still)
+        // Force the sprite to refresh now that the texture is loaded
+        sprite.setTexture(idleTexture, true); 
+        
+        sf::Vector2u idleSize = idleTexture.getSize();
+        
+        // Use the full image size for the idle origin
+        sprite.setOrigin({static_cast<float>(idleSize.x) / 2.f, static_cast<float>(idleSize.y) / 2.f});
+        sprite.setScale({0.1f, 0.1f}); 
+        sprite.setPosition({startX, startY});
 
-        sf::Vector2u size = texture.getSize();
-        sprite.setOrigin({static_cast<float>(size.x) / 2.f, static_cast<float>(size.y) / 2.f});
-
-        sprite.setScale({0.1f, 0.1f});
-        if (!gunTexture.loadFromFile("gun.png"))
-        {
+        // 4. LOAD GUN 
+        if (!gunTexture.loadFromFile("gun.png")) {
             std::printf("ERROR: Could not load gun.png\n");
         }
         gunTexture.setSmooth(false);
-        gunSprite = sf::Sprite(gunTexture);
-
-        gunSprite.setScale({0.05f, 0.05f});
+        
+        // Force the gun sprite to refresh 
+        gunSprite.setTexture(gunTexture, true);
 
         sf::Vector2u gunSize = gunTexture.getSize();
         gunSprite.setOrigin({-15.f, static_cast<float>(gunSize.y) / 2.f});
-
-        sprite.setPosition({startX, startY});
+        gunSprite.setScale({0.05f, 0.05f});
         gunSprite.setPosition({startX, startY});
     }
 
     // Notice the new argument at the end: const int dungeonMap[MAP_WIDTH][MAP_HEIGHT]
     void update(float dt, const sf::RenderWindow &window, const sf::View &worldView, std::vector<Bullet> &activeBullets, const std::vector<std::vector<int>> &dungeonMap)
     {
-
+        // --- 1. IFRAMES (Damage Flashing) ---
         if (iFrameTimer > 0.f)
         {
             iFrameTimer -= dt;
-            sprite.setColor(sf::Color::Cyan);
+            sprite.setColor(sf::Color::Cyan); // This will cleanly tint BOTH idle and run textures!
         }
         else
         {
             sprite.setColor(sf::Color::White);
         }
 
+        // --- 2. INPUT & NORMALIZATION ---
         sf::Vector2f movement({0.f, 0.f});
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
-            movement.y -= 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
-            movement.y += 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
-            movement.x -= 1.f;
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
-            movement.x += 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)) movement.y -= 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S)) movement.y += 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)) movement.x -= 1.f;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)) movement.x += 1.f;
 
-        if (movement.x != 0.f || movement.y != 0.f)
+        // Determine if we are moving for the animation logic!
+        isMoving = (movement.x != 0.f || movement.y != 0.f);
+
+        if (isMoving)
         {
             float length = std::sqrt(movement.x * movement.x + movement.y * movement.y);
             movement.x /= length;
             movement.y /= length;
         }
 
-        // --- MAP COLLISION (Wall Sliding) ---
+        // --- 3. MAP COLLISION (Wall Sliding) ---
         sf::Vector2f currentPos = sprite.getPosition();
 
-        // 1. Check Horizontal (X)
+        // Horizontal (X)
         if (movement.x != 0.f)
         {
             float nextX = currentPos.x + (movement.x * speed * dt);
             int gridX = static_cast<int>(nextX / TILE_SIZE);
             int gridY = static_cast<int>(currentPos.y / TILE_SIZE);
 
-            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT)
-            {
-                if (dungeonMap[gridX][gridY] == 0)
-                {
+            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                if (dungeonMap[gridX][gridY] == 0) {
                     sprite.move({movement.x * speed * dt, 0.f});
                 }
             }
         }
 
-        // 2. Check Vertical (Y)
+        // Vertical (Y)
         currentPos = sprite.getPosition();
         if (movement.y != 0.f)
         {
@@ -201,19 +223,69 @@ public:
             int gridX = static_cast<int>(currentPos.x / TILE_SIZE);
             int gridY = static_cast<int>(nextY / TILE_SIZE);
 
-            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT)
-            {
-                if (dungeonMap[gridX][gridY] == 0)
-                {
+            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                if (dungeonMap[gridX][gridY] == 0) {
                     sprite.move({0.f, movement.y * speed * dt});
                 }
             }
         }
 
-        // --- UPDATE GUN ---
-        sf::Vector2f handOffset(12.f, 10.f);
+        // --- 4. ANIMATION & TEXTURE SWAPPING ---
+        
+        // 1. Check which way the player is moving horizontally
+        if (movement.x > 0.f) isFacingRight = true;
+        if (movement.x < 0.f) isFacingRight = false;
+
+        if (isMoving) 
+        {
+            // A. Swap to RUN texture if needed
+            if (&sprite.getTexture() != &runTexture) {
+                sprite.setTexture(runTexture);
+                sprite.setOrigin({static_cast<float>(frameWidth) / 2.f, static_cast<float>(frameHeight) / 2.f});
+            }
+
+            // B. Apply RUN SCALE (Flip the X axis if facing left!)
+            sprite.setScale({isFacingRight ? runScale.x : -runScale.x, runScale.y});
+
+            // C. Play the animation frames
+            animTimer += dt;
+            if (animTimer >= animDuration) {
+                currentFrame++;
+                if (currentFrame >= maxFrames) {
+                    currentFrame = 0;
+                }
+                animTimer = 0.f;
+            }
+            
+            // D. Move the "cookie cutter" to the current frame
+            sprite.setTextureRect(sf::IntRect({currentFrame * frameWidth, 0}, {frameWidth, frameHeight}));
+        } 
+        else 
+        {
+            // A. Swap to IDLE texture if needed
+            if (&sprite.getTexture() != &idleTexture) {
+                sprite.setTexture(idleTexture);
+                
+                sf::Vector2u idleSize = idleTexture.getSize();
+                sprite.setTextureRect(sf::IntRect({0, 0}, {static_cast<int>(idleSize.x), static_cast<int>(idleSize.y)}));
+                sprite.setOrigin({static_cast<float>(idleSize.x) / 2.f, static_cast<float>(idleSize.y) / 2.f});
+                
+                currentFrame = 0; 
+                animTimer = 0.f;
+            }
+
+            // B. Apply IDLE SCALE (Flip the X axis if facing left!)
+            sprite.setScale({isFacingRight ? idleScale.x : -idleScale.x, idleScale.y});
+        }
+
+        // --- 5. UPDATE GUN ---
+        
+        // 1. Flip the hand offset depending on which way the PLAYER is facing
+        float currentHandOffsetX = isFacingRight ? 12.f : -12.f;
+        sf::Vector2f handOffset(currentHandOffsetX, 10.f);
         gunSprite.setPosition(sprite.getPosition() + handOffset);
 
+        // 2. Calculate aiming angle
         sf::Vector2i mousePixelPos = sf::Mouse::getPosition(window);
         sf::Vector2f mousePos = window.mapPixelToCoords(mousePixelPos, worldView);
         float dx = mousePos.x - sprite.getPosition().x;
@@ -221,6 +293,18 @@ public:
         float angle = std::atan2(dy, dx) * 180.f / 3.14159265f;
         gunSprite.setRotation(sf::degrees(angle));
 
+        // 3. Mirror the gun visually so it isn't upside down when aiming left!
+        if (dx < 0.f) 
+        {
+            // Aiming Left: Flip the local Y-axis (-0.05f) to flip it right-side up
+            gunSprite.setScale({0.05f, -0.05f});
+        } 
+        else 
+        {
+            // Aiming Right: Normal scale (0.05f)
+            gunSprite.setScale({0.05f, 0.05f});
+        }
+        // --- 6. SHOOTING ---
         fireCooldown -= dt;
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && fireCooldown <= 0.f)
         {
@@ -265,8 +349,7 @@ int main()
     float spawnY = (MAP_HEIGHT * TILE_SIZE) / 2.f;
     
     // Now create the player using these new variables!
-    Player player(spawnX, spawnY);
-
+    Player player(spawnX, spawnY, 500, 512, 4);
     sf::Font font;
     bool hasFont = font.openFromFile("arial.ttf");
     if (!hasFont){
