@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <iostream>
+
 const int MAP_WIDTH = 200;
 const int MAP_HEIGHT = 200;
 const float TILE_SIZE = 64.f;
@@ -180,7 +182,7 @@ public:
         if (iFrameTimer > 0.f)
         {
             iFrameTimer -= dt;
-            sprite.setColor(sf::Color::Cyan); // This will cleanly tint BOTH idle and run textures!
+            sprite.setColor(sf::Color::Red); 
         }
         else
         {
@@ -392,6 +394,7 @@ int main()
 
     
     if (!shootBuffer.loadFromFile("shootSound.nmp3")) { 
+        
 
     }
    
@@ -399,19 +402,18 @@ int main()
 
 
     if (!bgm.openFromFile("bgm.mp3")) { 
-        // Error handling if music is missing
+        
     }
-    bgm.setLooping(true); // Tell the music to loop forever! (If you get an error, try setLoop(true))
-    bgm.setVolume(50.f);  // Background music is usually too loud, turn it down a bit (0 to 100)
+    bgm.setLooping(true); 
 
-   if (!shootBuffer.loadFromFile("shootSound.mp3")) { /* Error handling */ }
+   if (!shootBuffer.loadFromFile("shootSound.mp3")) { std::printf("ERROR: Could not find shootSound.mp3\n");  }
     
-    // Put the sound into the optional box and give it the buffer!
+    
     shootSound.emplace(shootBuffer);
-    shootSound->setVolume(70.f); // Notice we use an arrow (->) now!
+    shootSound->setVolume(70.f); 
 
     
-    if (!killBuffer.loadFromFile("killSound.mp3")) { /* Error handling */ }
+    if (!killBuffer.loadFromFile("killSound.mp3")) { std::printf("ERROR: Could not find killSound.mp3\n"); }
     
     killSound.emplace(killBuffer);
     killSound->setVolume(80.f);
