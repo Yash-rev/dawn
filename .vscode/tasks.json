@@ -9,6 +9,8 @@
                 
                 "-fdiagnostics-color=always",
                 "-g",
+                "-O2", 
+                "-mwindows",
                 "-std=c++17",
                 "${workspaceFolder}/src/*.cpp",
                 "-I${workspaceFolder}/include",

@@ -29,7 +29,7 @@ enum class State
 State currentState = State::MENU;
 
 struct Bullet
-{
+{    
     sf::CircleShape shape;
     sf::Vector2f velocity;
     float speed;
