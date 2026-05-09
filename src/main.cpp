@@ -28,27 +28,61 @@ enum class State
 };
 State currentState = State::MENU;
 
-struct Bullet
-{    
+struct Bullet {
+    Bullet() = default; 
+
     sf::CircleShape shape;
+    std::optional<sf::Sprite> sprite; 
+    bool isSprite = false;            
+
     sf::Vector2f velocity;
     float speed;
 
-    Bullet(sf::Vector2f startPosition, sf::Vector2f direction)
-    {
+    Bullet(sf::Vector2f startPosition, sf::Vector2f direction) {
         shape.setRadius(5.f);
         shape.setFillColor(sf::Color::Yellow);
         shape.setOrigin({5.f, 5.f});
         shape.setPosition(startPosition);
         velocity = direction;
         speed = 800.f;
+        isSprite = false; 
     }
 
-    void update(float dt)
-    {
-        shape.move(velocity * speed * dt);
+    
+    void update(float dt) {
+        if (isSprite && sprite) {
+            sprite->move(velocity * speed * dt); 
+        } else {
+            shape.move(velocity * speed * dt);   
+        }
     }
 };
+
+struct Boss {
+    std::optional<sf::Sprite> sprite;
+    
+    int currentFrame = 0;
+    int maxFrames = 4;
+    int frameWidth = 79;  
+    int frameHeight = 71; 
+    float animTimer = 0.f;
+    float animDuration = 0.15f;
+    float hp = 100.f;
+    float maxHp = 2000.f;
+    float speed = 100.f;
+    float shootTimer = 0.f;
+    float shootCooldown = 1.5f;
+    bool isActive = false;
+    bool isDefeated = false;
+};
+
+
+std::vector<Bullet> activeBullets; 
+std::vector<Bullet> enemyBullets;  
+Boss boss;                        
+
+sf::RectangleShape bossHealthBarBG; 
+sf::RectangleShape bossHealthBarFG; 
 
 struct Enemy
 {
@@ -72,10 +106,19 @@ struct Enemy
     void update(float dt, sf::Vector2f playerPos, const std::vector<std::vector<int>>& dungeonMap) {
         sf::Vector2f currentPos = sprite.getPosition();
         
-        //direction towards player
+      
         float dx = playerPos.x - currentPos.x;
         float dy = playerPos.y - currentPos.y;
         float distance = std::sqrt(dx * dx + dy * dy);
+
+        if (dx > 0.f) {
+            
+            sprite.setScale({-1.f, 1.f}); 
+        } 
+        else if (dx < 0.f) {
+           
+            sprite.setScale({1.f, 1.f}); 
+        }
         
         if (distance > 0) {
             float moveX = (dx / distance) * speed * dt;
@@ -92,7 +135,7 @@ struct Enemy
                 }
             }
 
-            currentPos = sprite.getPosition(); // Update position after X movement
+            currentPos = sprite.getPosition(); 
             float nextY = currentPos.y + moveY;
             gridX = static_cast<int>(currentPos.x / TILE_SIZE); 
             gridY = static_cast<int>(nextY / TILE_SIZE);
@@ -176,7 +219,7 @@ public:
     }
 
     
-    void update(float dt, const sf::RenderWindow &window, const sf::View &worldView, std::vector<Bullet> &activeBullets, const std::vector<std::vector<int>> &dungeonMap)
+    void update(float dt, const sf::RenderWindow &window, const sf::View &worldView, const std::vector<std::vector<int>> &dungeonMap)
     {
 
         if (iFrameTimer > 0.f)
@@ -317,7 +360,9 @@ public:
             {
                 sf::Vector2f fireDirection({dx / distance, dy / distance});
                 sf::Vector2f spawnPos = sprite.getPosition() + (fireDirection * 45.f);
+                
                 activeBullets.emplace_back(spawnPos, fireDirection);
+                std::cout << "Bullet Fired! Total in list: " << activeBullets.size() << std::endl;
                 fireCooldown = fireRate;
             }
             shootSound->play();
@@ -452,6 +497,37 @@ int main()
         scoreText.setString("Kills: 0");
     }
 
+   sf::Text bossNameText(font); 
+    if (hasFont) {
+        bossNameText.setString("THE HELLBAT"); 
+        bossNameText.setCharacterSize(20);      
+        bossNameText.setFillColor(sf::Color::Red);
+        
+        bossNameText.setOutlineColor(sf::Color::Black);
+        bossNameText.setOutlineThickness(2.f); 
+    }
+
+    float victoryTimer = 0.f; 
+    float victoryDuration = 4.f; 
+    
+    // The "Dull Screen" Overlay
+    sf::RectangleShape dimOverlay({800.f, 600.f}); 
+    dimOverlay.setFillColor(sf::Color(0, 0, 0, 150)); 
+    
+    sf::Text victoryText(font);
+    if (hasFont) {
+        victoryText.setString("CONGRATULATIONS! \n You have defeated the HELLBAT!!");
+        victoryText.setCharacterSize(30);
+        victoryText.setFillColor(sf::Color::Red);
+        victoryText.setOutlineColor(sf::Color::Black);
+        victoryText.setOutlineThickness(3.f);
+        
+       
+        sf::FloatRect bounds = victoryText.getLocalBounds();
+        victoryText.setOrigin({bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f});
+        victoryText.setPosition({400.f, 300.f}); 
+    }
+
     // GRID
     sf::VertexArray grid(sf::PrimitiveType::Lines);
     sf::Color gridColor(30, 30, 30);
@@ -481,7 +557,7 @@ int main()
     sf::View worldView(sf::Vector2f(400.f, 300.f), sf::Vector2f(800.f, 600.f));
     sf::View uiView = window.getDefaultView();
 
-    std::vector<Bullet> bullets;
+    
     std::vector<Enemy> enemies;
     float spawnTimer = 0.f;
     float spawnRate = 0.5f;
@@ -491,6 +567,16 @@ int main()
     if (!enemyTexture.loadFromFile("enemy.png"))
     {
         std::printf("ERROR: Could not load enemy.png\n");
+    }
+
+    sf::Texture bossTexture;
+    if (!bossTexture.loadFromFile("boss_spritesheet.png")) { 
+        std::printf("ERROR: Could not load boss image!\n");
+    }
+    
+    sf::Texture bossBulletTexture;
+    if (!bossBulletTexture.loadFromFile("boss_bullet.png")) { 
+        std::printf("ERROR: Could not load boss bullet image!\n");
     }
 
 
@@ -587,7 +673,7 @@ int main()
 
         else if (currentState == State::PLAYING)
         {
-            player.update(dt, window, worldView, bullets, dungeonMap);
+            player.update(dt, window, worldView, dungeonMap);
 
             worldView.setCenter(player.sprite.getPosition());
 
@@ -604,49 +690,168 @@ int main()
             for (auto& e : enemies) {
                 e.update(dt, player.sprite.getPosition(), dungeonMap);
             }
+            if (boss.isActive && boss.sprite) {
+            
+            // boss animation
+            boss.animTimer += dt;
+            if (boss.animTimer >= boss.animDuration) {
+                boss.currentFrame++;
+                if (boss.currentFrame >= boss.maxFrames) {
+                    boss.currentFrame = 0;
+                }
+                boss.sprite->setTextureRect(sf::IntRect({boss.currentFrame * boss.frameWidth, 0}, {boss.frameWidth, boss.frameHeight}));
+                boss.animTimer = 0.f;
+            }
+
+           
+            sf::Vector2f dir = player.sprite.getPosition() - boss.sprite->getPosition(); 
+            float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+            if (length > 0) {
+                dir /= length; 
+                boss.sprite->move(dir * boss.speed * dt); 
+            }
+
+            // boss shooting
+            boss.shootTimer += dt;
+            if (boss.shootTimer >= boss.shootCooldown) {
+                
+                enemyBullets.emplace_back();
+                enemyBullets.back().velocity = dir;
+                enemyBullets.back().speed = 250.f;
+                enemyBullets.back().isSprite = true; 
+                
+                enemyBullets.back().sprite.emplace(bossBulletTexture);
+                enemyBullets.back().sprite->setPosition(boss.sprite->getPosition());
+                
+            
+                enemyBullets.back().sprite->setOrigin({16.f, 16.f}); 
+                
+                
+                float angle = std::atan2(dir.y, dir.x) * 180.f / 3.14159f;
+                enemyBullets.back().sprite->setRotation(sf::degrees(angle));
+                
+                enemyBullets.back().sprite->setScale({-2.f, 2.f});
+
+                boss.shootTimer = 0.f; 
+            }
 
             
-            for (int i = bullets.size() - 1; i >= 0; i--) {
-                bullets[i].update(dt);
-                bool bulletDestroyed = false;
-                
-                // Wall Collision 
-                sf::Vector2f pos = bullets[i].shape.getPosition();
-                int gridX = static_cast<int>(pos.x / TILE_SIZE);
-                int gridY = static_cast<int>(pos.y / TILE_SIZE);
-                
-                if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
-                   
-                    if (dungeonMap[gridX][gridY] > 0) {
-                        bullets.erase(bullets.begin() + i);
-                        bulletDestroyed = true;
-                    }
-                }
-                
-                
-                if (!bulletDestroyed) {
-                    for (int j = enemies.size() - 1; j >= 0; j--) {
-                        
-                       
-                       if (bullets[i].shape.getGlobalBounds().findIntersection(enemies[j].sprite.getGlobalBounds())) {
-                            
-                            
-                            enemies.erase(enemies.begin() + j);
-                            
-                          
-                            bullets.erase(bullets.begin() + i);
-                            killSound->play();
-                            
-                            killCount++;
-                            
-                            
-                            scoreText.setString("Kills: " + std::to_string(killCount));
-                            
-                            break; 
-                        }
+            float hpPercent = boss.hp / boss.maxHp;
+            bossHealthBarFG.setSize({600.f * hpPercent, 15.f});
+        }
+        for (int i = 0; i < enemyBullets.size(); i++) {
+            enemyBullets[i].update(dt); 
+            
+            if (enemyBullets[i].sprite && enemyBullets[i].sprite->getGlobalBounds().findIntersection(player.sprite.getGlobalBounds())) {
+                player.takeDamage(); 
+                enemyBullets.erase(enemyBullets.begin() + i);
+                i--;
+            }
+        }
+
+        
+        if (boss.isActive && boss.sprite) {
+            for (int i = 0; i < activeBullets.size(); i++) {
+                if (activeBullets[i].shape.getGlobalBounds().findIntersection(boss.sprite->getGlobalBounds())) {
+                    boss.hp -= 25; 
+                    if(killSound) killSound->play(); 
+                    
+                    activeBullets.erase(activeBullets.begin() + i);
+                    i--;
+
+                    if (boss.hp <= 0) {
+                        boss.isActive = false;
+                        boss.isDefeated = true;
+
+                        victoryTimer = victoryDuration;
                     }
                 }
             }
+        }
+
+        if (boss.isDefeated && victoryTimer > 0.f) {
+                victoryTimer -= dt;
+
+                
+                int alpha = 255; 
+                if (victoryTimer < 2.f) {
+                    alpha = static_cast<int>((victoryTimer / 2.f) * 255.f);
+                    if (alpha < 0) alpha = 0; 
+                }
+                
+               
+                victoryText.setFillColor(sf::Color(255, 255, 0, alpha));
+                
+               
+                victoryText.setOutlineColor(sf::Color(0, 0, 0, alpha)); 
+            }
+
+       
+        for (int i = activeBullets.size() - 1; i >= 0; i--) {
+            activeBullets[i].update(dt);
+            bool bulletDestroyed = false;
+            
+            sf::Vector2f pos = activeBullets[i].shape.getPosition();
+            int gridX = static_cast<int>(pos.x / TILE_SIZE);
+            int gridY = static_cast<int>(pos.y / TILE_SIZE);
+            
+            // Wall Collision
+            if (gridX >= 0 && gridX < MAP_WIDTH && gridY >= 0 && gridY < MAP_HEIGHT) {
+                if (dungeonMap[gridX][gridY] > 0) {
+                    activeBullets.erase(activeBullets.begin() + i);
+                    bulletDestroyed = true;
+                }
+            }
+
+            
+            if (!bulletDestroyed) {
+                for (int j = enemies.size() - 1; j >= 0; j--) {
+                    if (activeBullets[i].shape.getGlobalBounds().findIntersection(enemies[j].sprite.getGlobalBounds())) {
+                        
+                        enemies.erase(enemies.begin() + j);
+                        activeBullets.erase(activeBullets.begin() + i);
+                        if(killSound) killSound->play();
+                        
+                        killCount++;
+                        scoreText.setString("Kills: " + std::to_string(killCount));
+                        
+                      
+                        if (killCount >= 35 && !boss.isActive && !boss.isDefeated) {
+                            boss.isActive = true;
+                            boss.hp = boss.maxHp;
+                            
+                            
+                            boss.sprite.emplace(bossTexture);
+                            boss.sprite->setTextureRect(sf::IntRect({0, 0}, {boss.frameWidth, boss.frameHeight}));
+                            boss.sprite->setOrigin({boss.frameWidth / 2.f, boss.frameHeight / 2.f});
+                            
+                            boss.sprite->setScale({2.f, 2.f});
+
+                            bossHealthBarBG.setSize({600.f, 15.f});
+                            bossHealthBarBG.setFillColor(sf::Color(100, 0, 0));
+                            bossHealthBarBG.setPosition({100.f, 100.f}); 
+                            
+                            bossHealthBarFG.setSize({600.f, 15.f});
+                            bossHealthBarFG.setFillColor(sf::Color::Red);
+                            bossHealthBarFG.setPosition({100.f, 100.f});
+                            
+                           
+                            bossNameText.setPosition({325.f, 120.f});
+                            
+                            float randomAngle = (rand() % 360) * 3.14159f / 180.f; 
+                            float spawnDist = 1200.f; 
+                            float spawnX = player.sprite.getPosition().x + (std::cos(randomAngle) * spawnDist);
+                            float spawnY = player.sprite.getPosition().y + (std::sin(randomAngle) * spawnDist);
+                            
+                            boss.sprite->setPosition({spawnX, spawnY});
+                        }
+                        
+                        break; 
+                    }
+                }
+            }
+        }
+        
 
            
             for (auto &e : enemies)
@@ -663,15 +868,20 @@ int main()
 
         else if (currentState == State::GAMEOVER)
         {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R))
-            {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R)) {
                 // RESET
                 player.hp = player.maxHp;
                 player.isDead = false;
                 player.sprite.setPosition({spawnX, spawnY});
                 player.sprite.setColor(sf::Color::White);
+                
                 enemies.clear();
-                bullets.clear();
+                activeBullets.clear(); 
+                enemyBullets.clear();  
+                
+                boss.isActive = false; 
+                boss.isDefeated = false;
+                
                 killCount = 0;
                 scoreText.setString("Kills: 0");
                 currentState = State::PLAYING;
@@ -691,75 +901,95 @@ int main()
         }
 
        
-        window.clear(sf::Color::Black);
+       window.clear(sf::Color::Black);
 
         if (currentState == State::MENU) {
             window.setView(uiView);
             window.draw(menuText);
-        }
+        } 
         else if (currentState == State::PLAYING) {
             
-            
+          
             window.setView(worldView);
-            
-        
             window.draw(grid);
 
-            
-           for (int x = 0; x < MAP_WIDTH; x++) {
+            for (int x = 0; x < MAP_WIDTH; x++) {
                 for (int y = 0; y < MAP_HEIGHT; y++) {
-                    
                     int tileID = dungeonMap[x][y];
                     
-                    
                     sf::Sprite floorSprite(floorTexture);
-                    
                     sf::Vector2u floorTexSize = floorTexture.getSize();
-                    float floorScaleX = TILE_SIZE / static_cast<float>(floorTexSize.x);
-                    float floorScaleY = TILE_SIZE / static_cast<float>(floorTexSize.y);
-                    
-                    floorSprite.setScale({floorScaleX, floorScaleY});
+                    floorSprite.setScale({TILE_SIZE / floorTexSize.x, TILE_SIZE / floorTexSize.y});
                     floorSprite.setPosition({x * TILE_SIZE, y * TILE_SIZE});
-                    
                     window.draw(floorSprite);
 
-                    
                     if (tileID > 0 && !obstacleTextures.empty()) {
-                        const sf::Texture& currentTexture = obstacleTextures[tileID - 1];
-                        sf::Sprite wallSprite(currentTexture);
-                        
-                        sf::Vector2u wallTexSize = currentTexture.getSize();
-                        float wallScaleX = TILE_SIZE / static_cast<float>(wallTexSize.x);
-                        float wallScaleY = TILE_SIZE / static_cast<float>(wallTexSize.y);
-                        
-                        wallSprite.setScale({wallScaleX, wallScaleY});
+                        sf::Sprite wallSprite(obstacleTextures[tileID - 1]);
+                        sf::Vector2u wallTexSize = obstacleTextures[tileID - 1].getSize();
+                        wallSprite.setScale({TILE_SIZE / wallTexSize.x, TILE_SIZE / wallTexSize.y});
                         wallSprite.setPosition({x * TILE_SIZE, y * TILE_SIZE});
-                        
                         window.draw(wallSprite);
                     }
                 }
             }
-            // DRAW ENTITIES
+
+            
             for (auto& e : enemies) window.draw(e.sprite);
-            for (auto& b : bullets) window.draw(b.shape);
+            
+            for (const auto& bullet : activeBullets) {
+                window.draw(bullet.shape); 
+            }
+            
             player.draw(window);
 
-            // SWITCH TO UI CAMERA 
-            window.setView(uiView);
-            window.draw(scoreText);
+           
+            if (boss.isActive && boss.sprite) {
+                window.draw(*boss.sprite);
+            }
+
             
-            sf::RectangleShape hpBar({200.f * (player.hp / (float)player.maxHp), 20.f});
+
+            for (const auto& bullet : enemyBullets) {
+                if (bullet.isSprite && bullet.sprite) {
+                    window.draw(*bullet.sprite); 
+                }
+            }
+
+          
+            sf::View savedWorldView = window.getView();
+            window.setView(window.getDefaultView()); 
+
+            sf::RectangleShape hpBar({200.f * ((float)player.hp / player.maxHp), 20.f});
             hpBar.setFillColor(sf::Color::Red);
             hpBar.setPosition({20.f, 20.f});
             window.draw(hpBar);
-        }
+
+            window.draw(scoreText);
+
+            if (boss.isActive) {
+                window.draw(bossHealthBarBG);
+                window.draw(bossHealthBarFG);
+                window.draw(bossNameText);
+            }
+
+            if (boss.isDefeated && victoryTimer > 0.f) {
+                window.draw(dimOverlay); 
+                
+                
+                    window.draw(victoryText); 
+                
+            }
+
+            window.setView(savedWorldView);
+        } 
+
+        
         else if (currentState == State::GAMEOVER) {
             window.setView(uiView);
             window.draw(gameOverText);
         }
 
         window.display();
-    
     }
     return 0;
 }
